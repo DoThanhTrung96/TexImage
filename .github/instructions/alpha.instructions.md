@@ -107,3 +107,32 @@ Usage example (developer)
 - Before running training: export PROMPT_TRAINING_MODE="dry" PROMPT_TRAINING_LOG_DIR="/path/to/logs" PROMPT_TRAINING_REVIEWERS="alice,bob"
 - Run the training tool; review logs and reviewer notes; only deploy updated prompts after sign-off.
 
+## Agent Auto-Logging Protocol
+
+Purpose
+- Automatically maintain interaction history for successful verifications and positive user feedback
+- Reduce manual documentation effort and improve knowledge retention
+- Create searchable reference for future similar requests
+
+Auto-logging triggers
+- Successful verification completion
+- Positive user feedback phrases (e.g., "good", "very good", "excellent", "perfect")
+- Explicit confirmation of implementation correctness
+
+Required environment variables
+- AGENT_LOG_DIR - directory for storing interaction logs
+- AGENT_LOG_RETENTION - number of days to retain logs (default: 30)
+
+Logging format
+- Timestamp
+- Interaction ID
+- Request type
+- Verification status or feedback received
+- Implementation summary
+- Used environment variables
+- Execution context
+
+Retention policy
+- Auto-archived after AGENT_LOG_RETENTION days
+- Critical interactions flagged for extended retention
+- Logs encrypted if containing sensitive context
