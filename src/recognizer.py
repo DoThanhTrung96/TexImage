@@ -2,53 +2,73 @@ import ollama
 import base64
 import json
 
-def recognize_labels_with_ollama(image_path, model='llava'):
+def analyze_geometry_with_llm(image_path):
     """
-    Recognizes single-character labels in an image using a multimodal LLM via Ollama.
+    Analyzes a geometric image using a multimodal LLM (Ollama) with a detailed prompt
+    and returns a structured JSON description.
     """
-    print(f"Recognizing labels in {image_path} using Ollama model '{model}'...")
-    
     with open(image_path, "rb") as f:
-        image_data = base64.b64encode(f.read()).decode('utf-8')
+        image_data = f.read()
+        encoded_image = base64.b64encode(image_data).decode("utf-8")
 
     prompt = """
-    Analyze the provided image of a geometric drawing.
-    Identify all single-character uppercase or lowercase letter labels (A-Z, a-z).
-    Return a JSON object containing a single key "labels".
-    The value of "labels" should be a list of objects, where each object has:
-    1. "label": the single character identified (e.g., "S", "A", "B").
-    2. "center": a list of two integers [x, y] representing the center coordinates of the label.
-    Do not identify any multi-character text or symbols.
-    Example response: {"labels": [{"label": "S", "center": [150, 30]}, {"label": "A", "center": [50, 200]}]}
+    Analyze the provided image of a geometric figure with extreme care. Your task is to produce a single, clean JSON object describing the figure. Follow these steps precisely:
+
+    1.  **Find all Vertices:** Scan the entire image and identify every single capital letter (e.g., S, A, B, C, D, I, H). These are the vertices. For each vertex, provide its label and estimated 2D coordinates (top-left is origin).
+
+    2.  **Find all Edges and their Styles:** Identify every line connecting two vertices. For each and every edge, you MUST classify its style as either 'solid' or 'dashed'. This is a mandatory field.
+
+    3.  **Find all Edge Labels:** Scan the image for any lowercase letters, typically positioned near the midpoint of an edge (e.g., 'a'). Associate each lowercase letter with the edge it is labeling.
+
+    4.  **Find all Angle Labels:** Locate any angle notations (e.g., '45°') and identify the three vertices that form the angle.
+
+    5.  **Final Review (Crucial):** Before generating the JSON, review your findings.
+        *   Have you included the vertex 'S'?
+        *   Have you included the edge label 'a'?
+        *   Does every single edge in your list have a 'style' attribute?
+
+    Now, construct a single JSON object with the following structure. Do not include any other text, explanations, or markdown formatting outside of the final JSON block.
+
+    {
+      "vertices": [
+        {"label": "...", "coordinates": [x, y]},
+        ...
+      ],
+      "edges": [
+        {"start": "...", "end": "...", "style": "solid|dashed", "label": "a"},
+        ...
+      ],
+      "angles": [
+        {"label": "45°", "vertices": ["vertex1", "vertex2", "vertex3"]}
+      ]
+    }
     """
 
     try:
         response = ollama.chat(
-            model=model,
+            model="llava",
             messages=[
                 {
-                    'role': 'user',
-                    'content': prompt,
-                    'images': [image_data]
+                    "role": "user",
+                    "content": prompt,
+                    "images": [encoded_image],
                 }
             ],
-            format='json'
         )
         
-        # The response content is a JSON string, so we need to parse it
-        response_text = response['message']['content']
-        print("Ollama response received. Parsing JSON...")
-        data = json.loads(response_text)
+        json_response = response["message"]["content"]
         
-        # Basic validation of the response structure
-        if "labels" in data and isinstance(data["labels"], list):
-            print(f"Successfully parsed {len(data['labels'])} labels from Ollama response.")
-            return data["labels"]
+        # Extract only the JSON block from the response
+        json_start = json_response.find('{')
+        json_end = json_response.rfind('}') + 1
+        
+        if json_start != -1 and json_end != -1:
+            json_string = json_response[json_start:json_end]
+            return json.loads(json_string)
         else:
-            print("Warning: Ollama response did not contain a valid 'labels' list.")
-            return []
+            print("Error: Could not find a JSON block in the Ollama response.")
+            return None
 
     except Exception as e:
         print(f"An error occurred while communicating with Ollama: {e}")
-        print("Please ensure Ollama is running and the specified model is available.")
-        return []
+        return None
