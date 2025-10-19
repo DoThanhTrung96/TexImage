@@ -82,7 +82,63 @@ def detect_geometry_roi(binary_image, original_image):
 
     return cropped_image, (x, y)
 
-def detect_vertices(lines):
-    """Detects vertices (endpoints and intersections) from detected lines. (Placeholder)"""
-    # This will involve finding intersections of lines and unique endpoints.
-    return np.array([])
+def detect_vertices(lines, intersection_threshold=10):
+    """Detects vertices from line endpoints and intersections."""
+    endpoints = []
+    for x1, y1, x2, y2 in lines:
+        endpoints.append((x1, y1))
+        endpoints.append((x2, y2))
+
+    # Cluster nearby endpoints to merge them into single vertices
+    vertices = []
+    for point in endpoints:
+        is_new_vertex = True
+        for i, vertex in enumerate(vertices):
+            dist = np.linalg.norm(np.array(point) - np.array(vertex))
+            if dist < intersection_threshold:
+                # Update vertex to be the average of the clustered points
+                vertices[i] = tuple(np.mean([vertex, point], axis=0).astype(int))
+                is_new_vertex = False
+                break
+        if is_new_vertex:
+            vertices.append(point)
+    
+    return np.array(vertices)
+
+def enhance_image_for_ocr(image):
+    """Enhances the image quality for better OCR results.
+    Applies rescaling and sharpening.
+    """
+    # Rescale the image to a higher resolution (e.g., 2x)
+    scale_factor = 2
+    resized_image = cv2.resize(image, None, fx=scale_factor, fy=scale_factor, interpolation=cv2.INTER_CUBIC)
+
+    # Convert to grayscale if not already
+    if len(resized_image.shape) == 3:
+        gray = cv2.cvtColor(resized_image, cv2.COLOR_BGR2GRAY)
+    else:
+        gray = resized_image
+
+    # Apply sharpening (unsharp masking)
+    # Create a blurred version of the image
+    blurred = cv2.GaussianBlur(gray, (0, 0), 3)
+    # Apply unsharp mask
+    sharpened = cv2.addWeighted(gray, 1.5, blurred, -0.5, 0)
+
+    # Apply adaptive thresholding for better text isolation
+    enhanced_image = cv2.adaptiveThreshold(sharpened, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2)
+
+    return enhanced_image
+
+def remove_lines_from_image(image, lines):
+    """Removes detected lines from an image to isolate labels for OCR."""
+    image_without_lines = image.copy()
+    for x1, y1, x2, y2 in lines:
+        # Draw over the lines with the background color (white)
+        # Increase thickness to better cover the lines
+        cv2.line(image_without_lines, (x1, y1), (x2, y2), (255, 255, 255), 5)
+    
+    # Apply a median blur to smooth out any remaining artifacts
+    image_without_lines = cv2.medianBlur(image_without_lines, 3)
+    
+    return image_without_lines

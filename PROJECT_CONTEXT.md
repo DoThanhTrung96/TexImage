@@ -8,15 +8,24 @@ The tool will analyze an image of a 3D geometric figure (like a pyramid or cube)
 
 ### Workflow
 
-1.  **Image Input**: User provides an image file (PNG, JPG) of a geometric drawing.
-2.  **Preprocessing**: The image is converted to grayscale and edges are detected.
-3.  **Primitive Detection**:
-    *   **Line Segments**: All line segments and their endpoints are detected.
-    *   **Line Style**: Each line is classified as `solid` or `dashed`.
-    *   **Vertices**: The 2D coordinates of all vertices are identified.
-4.  **Label Recognition**: Tesseract OCR is used to identify text labels for vertices (A, B), edges (a), and angles (45°).
-5.  **3D Structural Reconstruction**: A 3D data model of the geometry is inferred from the 2D primitives. This involves estimating 3D coordinates and building a graph of the figure's structure.
-6.  **TikZ Code Generation**: The final `TikZ` code is generated from the 3D model, using libraries like `tikz-3dplot` to handle perspective. Dashed styles are applied to hidden lines.
+1.  **Image Input & ROI Detection**: 
+    *   The user provides an image file (PNG, JPG).
+    *   The image is preprocessed (grayscale, binary inversion, dilation) to find the largest contour, which is assumed to be the geometric figure.
+    *   The image is then cropped to the bounding box of this contour (Region of Interest) for all further analysis.
+
+2.  **Primitive Detection (on ROI)**:
+    *   **Line Segments**: The Hough Line Transform is used on a Canny edge detection of the ROI to find all line segments.
+    *   **Line Style**: Each line is classified as `solid` or `dashed` by analyzing the pixel intensity patterns on the binary version of the ROI.
+    *   **Vertices**: Endpoints from all detected lines are collected and clustered based on proximity to identify unique vertices.
+
+3.  **Label Recognition (on OCR-optimized image)**:
+    *   **Line Removal**: To isolate text, a copy of the ROI is created, and all detected lines are programmatically erased.
+    *   **Image Enhancement**: This "text-only" image is upscaled and sharpened to improve OCR accuracy.
+    *   **Tesseract OCR**: The enhanced, text-only image is passed to Tesseract with a specific configuration (PSM 6, character whitelist) to recognize labels.
+
+4.  **3D Structural Reconstruction**: A 3D data model of the geometry is inferred from the 2D primitives. This involves estimating 3D coordinates and building a graph of the figure's structure.
+
+5.  **TikZ Code Generation**: The final `TikZ` code is generated from the 3D model, using libraries like `tikz-3dplot` to handle perspective. Dashed styles are applied to hidden lines.
 
 ### Technology Stack
 
@@ -25,5 +34,4 @@ The tool will analyze an image of a 3D geometric figure (like a pyramid or cube)
     *   `opencv-python`: For all core computer vision tasks.
     *   `pytesseract`: For Optical Character Recognition (OCR) of labels.
     *   `numpy`: For geometric calculations and coordinate transformations.
-    *   `Pillow`: For image manipulation.
-    *   `networkx`: (Recommended) For modeling the figure's structure as a graph.
+    *   `networkx`: For modeling the figure's structure as a graph.

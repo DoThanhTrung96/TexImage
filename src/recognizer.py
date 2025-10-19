@@ -1,24 +1,54 @@
-import cv2
-import pytesseract
+import ollama
+import base64
+import json
 
-def recognize_labels(image):
-    """Recognizes text labels in the image using Tesseract OCR."""
-    # Convert the image to a format suitable for Tesseract
-    # Tesseract works best with preprocessed images (e.g., grayscale, binarized)
-    # For now, we'll assume the input image is already preprocessed (e.g., edges or binary)
+def recognize_labels_with_ollama(image_path, model='llava'):
+    """
+    Recognizes single-character labels in an image using a multimodal LLM via Ollama.
+    """
+    print(f"Recognizing labels in {image_path} using Ollama model '{model}'...")
     
-    # You might need to install Tesseract OCR engine separately on your system
-    # and configure its path if it's not in your system's PATH.
-    # Example for Windows: pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
+    with open(image_path, "rb") as f:
+        image_data = base64.b64encode(f.read()).decode('utf-8')
 
-    text_data = pytesseract.image_to_data(image, output_type=pytesseract.Output.DICT)
-    
-    labels = []
-    n_boxes = len(text_data['level'])
-    for i in range(n_boxes):
-        if int(text_data['conf'][i]) > 60: # Filter out low confidence detections
-            x, y, w, h = text_data['left'][i], text_data['top'][i], text_data['width'][i], text_data['height'][i]
-            text = text_data['text'][i]
-            if text.strip(): # Only add non-empty text
-                labels.append({'text': text, 'bbox': (x, y, w, h)})
-    return labels
+    prompt = """
+    Analyze the provided image of a geometric drawing.
+    Identify all single-character uppercase or lowercase letter labels (A-Z, a-z).
+    Return a JSON object containing a single key "labels".
+    The value of "labels" should be a list of objects, where each object has:
+    1. "label": the single character identified (e.g., "S", "A", "B").
+    2. "center": a list of two integers [x, y] representing the center coordinates of the label.
+    Do not identify any multi-character text or symbols.
+    Example response: {"labels": [{"label": "S", "center": [150, 30]}, {"label": "A", "center": [50, 200]}]}
+    """
+
+    try:
+        response = ollama.chat(
+            model=model,
+            messages=[
+                {
+                    'role': 'user',
+                    'content': prompt,
+                    'images': [image_data]
+                }
+            ],
+            format='json'
+        )
+        
+        # The response content is a JSON string, so we need to parse it
+        response_text = response['message']['content']
+        print("Ollama response received. Parsing JSON...")
+        data = json.loads(response_text)
+        
+        # Basic validation of the response structure
+        if "labels" in data and isinstance(data["labels"], list):
+            print(f"Successfully parsed {len(data['labels'])} labels from Ollama response.")
+            return data["labels"]
+        else:
+            print("Warning: Ollama response did not contain a valid 'labels' list.")
+            return []
+
+    except Exception as e:
+        print(f"An error occurred while communicating with Ollama: {e}")
+        print("Please ensure Ollama is running and the specified model is available.")
+        return []

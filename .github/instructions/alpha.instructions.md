@@ -136,3 +136,4 @@ Retention policy
 - Auto-archived after AGENT_LOG_RETENTION days
 - Critical interactions flagged for extended retention
 - Logs encrypted if containing sensitive context
+
