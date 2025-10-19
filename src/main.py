@@ -1,41 +1,38 @@
 import os
 import sys
-import cv2
-from image_processor import load_image, preprocess_image, detect_geometry_roi
-from recognizer import analyze_geometry_with_llm
 import json
+import cv2
+from tikz_generator import generate_tikz_code
 
 def main():
-    # Define the input path for the original image
+    # Define paths
     base_dir = "C:\\Data\\TexImage-1\\image"
-    original_image_path = os.path.join(base_dir, "image.png")
+    json_path = os.path.join(base_dir, "manual_analysis.json")
+    image_path = os.path.join(base_dir, "cropped_image.png") # Needed for dimensions
+    output_tex_path = os.path.join(base_dir, "output.tex")
 
-    if not os.path.exists(original_image_path):
-        print(f"Error: Original image not found at {original_image_path}")
+    if not os.path.exists(json_path):
+        print(f"Error: Manual analysis JSON not found at {json_path}")
+        sys.exit(1)
+        
+    if not os.path.exists(image_path):
+        print(f"Error: Cropped image not found at {image_path}")
         sys.exit(1)
 
-    print(f"Loading original image: {original_image_path}")
-    original_image = load_image(original_image_path)
-    
-    # --- 1. Detect and save the Region of Interest ---
-    print("Detecting geometry ROI...")
-    _, binary_image, _ = preprocess_image(original_image)
-    cropped_image, _ = detect_geometry_roi(binary_image, original_image)
-    
-    cropped_image_path = os.path.join(base_dir, "cropped_image.png")
-    cv2.imwrite(cropped_image_path, cropped_image)
-    print(f"Cropped ROI image saved to {cropped_image_path}")
+    print(f"Loading manual analysis from: {json_path}")
+    with open(json_path, "r") as f:
+        geometry_data = json.load(f)
+        
+    image = cv2.imread(image_path)
+    height, width, _ = image.shape
 
-    # --- 2. Analyze the ROI with Ollama ---
-    print("Analyzing geometry with Ollama...")
-    geometry_data = analyze_geometry_with_llm(cropped_image_path)
-
-    # --- 3. Print the structured output ---
-    if geometry_data:
-        print("\n--- LLM Analysis Result ---")
-        print(json.dumps(geometry_data, indent=2))
-    else:
-        print("\n--- LLM Analysis Failed ---")
+    # --- Generate and save the TikZ code ---
+    print("\n--- Generating TikZ Code from Manual Analysis ---")
+    tikz_code = generate_tikz_code(geometry_data, width, height)
+    
+    with open(output_tex_path, "w") as f:
+        f.write(tikz_code)
+    print(f"TikZ code saved to {output_tex_path}")
 
 if __name__ == '__main__':
     main()

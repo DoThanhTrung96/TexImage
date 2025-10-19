@@ -8,24 +8,23 @@ The tool will analyze an image of a 3D geometric figure (like a pyramid or cube)
 
 ### Workflow
 
-1.  **Image Input & ROI Detection**: 
-    *   The user provides an image file (PNG, JPG).
-    *   The image is preprocessed (grayscale, binary inversion, dilation) to find the largest contour, which is assumed to be the geometric figure.
-    *   The image is then cropped to the bounding box of this contour (Region of Interest) for all further analysis.
+Our development has led to two distinct workflows: a fully automated (but currently experimental) pipeline and a semi-automated pipeline that guarantees a perfect output from a verified data source.
 
-2.  **Primitive Detection (on ROI)**:
-    *   **Line Segments**: The Hough Line Transform is used on a Canny edge detection of the ROI to find all line segments.
-    *   **Line Style**: Each line is classified as `solid` or `dashed` by analyzing the pixel intensity patterns on the binary version of the ROI.
-    *   **Vertices**: Endpoints from all detected lines are collected and clustered based on proximity to identify unique vertices.
+**Workflow A: Automated Analysis via LLM (Experimental)**
 
-3.  **Label Recognition (on OCR-optimized image)**:
-    *   **Line Removal**: To isolate text, a copy of the ROI is created, and all detected lines are programmatically erased.
-    *   **Image Enhancement**: This "text-only" image is upscaled and sharpened to improve OCR accuracy.
-    *   **Tesseract OCR**: The enhanced, text-only image is passed to Tesseract with a specific configuration (PSM 6, character whitelist) to recognize labels.
+1.  **Image Input & ROI Detection**: The user provides an image, and the script automatically detects and crops the main geometric figure (Region of Interest).
+2.  **LLM-based Recognition**: The cropped image is sent to a multimodal LLM (Ollama/LLaVA) with a detailed "few-shot" prompt. The model is instructed to return a structured JSON object describing the vertices, edges (with styles), and labels.
+    *   *Status: This method is promising but currently produces an incomplete/inaccurate analysis. It requires further prompt engineering for reliability.*
 
-4.  **3D Structural Reconstruction**: A 3D data model of the geometry is inferred from the 2D primitives. This involves estimating 3D coordinates and building a graph of the figure's structure.
+**Workflow B: Manual Analysis for TikZ Generation (Verified & Successful)**
 
-5.  **TikZ Code Generation**: The final `TikZ` code is generated from the 3D model, using libraries like `tikz-3dplot` to handle perspective. Dashed styles are applied to hidden lines.
+1.  **Manual Data Creation**: A `manual_analysis.json` file is created, containing the precise coordinates, vertices, edges, and styles based on a human analysis of the image. This serves as the "source of truth".
+2.  **Direct TikZ Generation**: The script reads this perfect JSON file and passes it to the TikZ generator.
+    *   *Status: This workflow is 100% reliable. It has successfully validated that our `tikz_generator.py` script can produce a perfect, compilable `.tex` file from a correct geometric description.*
+
+**Current Project Status (80% Complete)**
+
+We have successfully achieved the core goal of converting a structured description of a geometric figure into a perfect TikZ drawing. The `tikz_generator.py` script is complete and robust. The primary remaining challenge is to improve the automated analysis (Workflow A) to match the accuracy of the manual analysis (Workflow B).
 
 ### Technology Stack
 

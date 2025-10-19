@@ -12,36 +12,42 @@ def analyze_geometry_with_llm(image_path):
         encoded_image = base64.b64encode(image_data).decode("utf-8")
 
     prompt = """
-    Analyze the provided image of a geometric figure with extreme care. Your task is to produce a single, clean JSON object describing the figure. Follow these steps precisely:
+    Analyze the provided image of a geometric figure with extreme care. Your task is to produce a single, clean JSON object describing the figure.
 
-    1.  **Find all Vertices:** Scan the entire image and identify every single capital letter (e.g., S, A, B, C, D, I, H). These are the vertices. For each vertex, provide its label and estimated 2D coordinates (top-left is origin).
-
-    2.  **Find all Edges and their Styles:** Identify every line connecting two vertices. For each and every edge, you MUST classify its style as either 'solid' or 'dashed'. This is a mandatory field.
-
-    3.  **Find all Edge Labels:** Scan the image for any lowercase letters, typically positioned near the midpoint of an edge (e.g., 'a'). Associate each lowercase letter with the edge it is labeling.
-
-    4.  **Find all Angle Labels:** Locate any angle notations (e.g., '45°') and identify the three vertices that form the angle.
-
-    5.  **Final Review (Crucial):** Before generating the JSON, review your findings.
-        *   Have you included the vertex 'S'?
-        *   Have you included the edge label 'a'?
-        *   Does every single edge in your list have a 'style' attribute?
-
-    Now, construct a single JSON object with the following structure. Do not include any other text, explanations, or markdown formatting outside of the final JSON block.
-
+    Here is an example of a perfect analysis for a simple pyramid:
+    ---
+    EXAMPLE INPUT IMAGE: [A simple pyramid with top vertex 'O' and base vertices 'A' and 'B'. Edge AB is dashed and labeled 'x'.]
+    EXAMPLE OUTPUT JSON:
     {
       "vertices": [
-        {"label": "...", "coordinates": [x, y]},
-        ...
+        {"label": "O", "coordinates": [50, 10]},
+        {"label": "A", "coordinates": [10, 80]},
+        {"label": "B", "coordinates": [90, 80]}
       ],
       "edges": [
-        {"start": "...", "end": "...", "style": "solid|dashed", "label": "a"},
-        ...
+        {"start": "O", "end": "A", "style": "solid", "label": null},
+        {"start": "O", "end": "B", "style": "solid", "label": null},
+        {"start": "A", "end": "B", "style": "dashed", "label": "x"}
       ],
-      "angles": [
-        {"label": "45°", "vertices": ["vertex1", "vertex2", "vertex3"]}
-      ]
+      "angles": []
     }
+    ---
+
+    Now, analyze the new image provided. Follow these steps precisely:
+
+    1.  **Find all Vertices:** Scan the entire image and identify every single capital letter (e.g., S, A, B, C, D, I, H). These are the vertices. For each vertex, provide its label and estimated 2D coordinates as percentages of the image width and height (top-left is origin).
+
+    2.  **Find all Edges and their Styles:** Identify every line connecting two vertices. For each and every edge, you MUST classify its style as either 'solid' or 'dashed'.
+
+    3.  **Find all Edge Labels:** Scan for lowercase letters near the midpoint of an edge (e.g., 'a'). Associate it with the correct edge. If an edge has no label, the value for "label" should be null.
+
+    4.  **Final Review (Crucial):** Before generating the JSON, review your findings against the image.
+        *   Have you found all vertices, including 'S'?
+        *   Have you found all edges and correctly identified their 'solid' or 'dashed' style?
+        *   Have you found the edge label 'a'?
+        *   Is your output ONLY a single JSON object, just like the example?
+
+    Construct a single JSON object. Do not include any other text or explanations.
     """
 
     try:

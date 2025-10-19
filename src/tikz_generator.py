@@ -1,4 +1,4 @@
-def generate_tikz_code(geometry_data, image_size):
+def generate_tikz_code(geometry_data, image_width, image_height):
     """Generates TikZ code from a structured JSON geometry description."""
     
     if not geometry_data or "vertices" not in geometry_data or "edges" not in geometry_data:
@@ -6,57 +6,58 @@ def generate_tikz_code(geometry_data, image_size):
 
     # Start the TikZ code
     tikz_code = [
-        "\\documentclass[tikz, border=10pt]{standalone}",
+        "\\documentclass[border=2mm]{standalone}",
         "\\usepackage{tikz}",
-        "\\usepackage{amsmath}",
-        "\\usetikzlibrary{quotes, angles}",
+        "\\usepackage{tkz-euclide}",
+        "\\usetikzlibrary{quotes,angles}",
         "",
         "\\begin{document}",
-        "\\begin{tikzpicture}[scale=10]", # Scale up the drawing
+        "\\begin{tikzpicture}",
     ]
 
-    # Define coordinates for each vertex
-    # The LLM provides normalized coordinates, so we scale them by the image size
-    # And flip the y-axis
-    img_h, img_w = image_size
-    
-    processed_labels = set()
-    for vertex in geometry_data.get("vertices", []):
+    # The JSON now provides direct pixel coordinates.
+    # We scale them down for a reasonably sized TikZ drawing (e.g., dividing by 50)
+    # and flip the y-axis.
+    scale_factor = 50
+    for vertex in geometry_data["vertices"]:
         label = vertex["label"]
-        if label in processed_labels:
-            continue
-        processed_labels.add(label)
-        
         x, y = vertex["coordinates"]
-        # Apply scaling and flip y-axis
-        tikz_code.append(f"\\coordinate ({label}) at ({x:.3f}, {-y:.3f});")
+        x_coord = x / scale_factor
+        y_coord = -y / scale_factor
+        tikz_code.append(f"\\coordinate ({label}) at ({x_coord:.2f}, {y_coord:.2f});")
 
     # Draw the edges
-    for edge in geometry_data.get("edges", []):
+    for edge in geometry_data["edges"]:
         start = edge["start"]
         end = edge["end"]
         style = edge.get("style", "solid")
-        label = edge.get("label", "")
+        label = edge.get("label") # Can be null
         
-        draw_command = f"\\draw[{style}] ({start}) -- ({end})"
         if label:
-            draw_command += f" node[midway, above] {{${label}$}};"
+            # Use the 'to' syntax with the quotes library for labels
+            draw_command = f"\\draw[{style}] ({start}) to[\"${label}$\"] ({end});"
         else:
-            draw_command += ";"
+            # Use the standard '--' syntax for edges without labels
+            draw_command = f"\\draw[{style}] ({start}) -- ({end});"
+            
         tikz_code.append(draw_command)
         
-    # Add labels to the vertices
-    for label in processed_labels:
-        tikz_code.append(f"\\node[above right, font=\\small] at ({label}) {{${label}$}};")
+    # Draw the angles (if any)
+    if "angles" in geometry_data and geometry_data["angles"]:
+        for angle in geometry_data["angles"]:
+            angle_label = angle["label"]
+            points = angle["vertices"]
+            if len(points) == 3:
+                # Add degree symbol if the label is numeric
+                if angle_label.isnumeric():
+                    angle_label = f"{angle_label}^\\circ"
+                tikz_code.append(f"\\tkzMarkAngle[size=0.8, mark=none]({points[2]},{points[1]},{points[0]})")
+                tikz_code.append(f"\\tkzLabelAngle[pos=1.2]({points[2]},{points[1]},{points[0]}){{${angle_label}$}}")
 
-    # Draw angles
-    for angle in geometry_data.get("angles", []):
-        label = angle["label"]
-        verts = angle["vertices"]
-        if len(verts) == 3:
-            tikz_code.append(
-                f"\\pic [draw, angle radius=0.5cm, \"${label}$\", angle eccentricity=1.5] {{angle = {verts[2]}--{verts[1]}--{verts[0]}}};"
-            )
+    # Add labels to the vertices
+    for vertex in geometry_data["vertices"]:
+        label = vertex["label"]
+        tikz_code.append(f"\\node[above right=1pt of {label}] {{${label}$}};")
 
     # End the TikZ code
     tikz_code.extend([
